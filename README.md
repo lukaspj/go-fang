@@ -21,10 +21,10 @@ type Config struct {
 }
 
 config := fang.New[Config].
-	WithEnvironment(map[string]string {
-		"NAME": "Name"
+    WithEnvironment(map[string]string {
+        "NAME": "Name"
     }).
-	Load()
+    Load()
 ```
 
 This would load the `NAME` environment variable into `config.Name`. There is 

@@ -30,3 +30,5 @@ jobs:
 
       - name: Test
         uses: robherley/go-test-action@b19f6aadabfb1ad85079065b21aa2af132466468
+        with:
+          omit: pie

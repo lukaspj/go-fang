@@ -6,9 +6,14 @@ import (
 	"strings"
 )
 
+var ErrFieldNotFound = errors.New("field not found")
+
+type Mapper func(from, to reflect.Type, data any) (any, error)
+
 type Loader[T any] struct {
-	Data  T
-	Fangs []func(Loader[T]) (Loader[T], error)
+	Data    T
+	Fangs   []func(Loader[T]) (Loader[T], error)
+	Mappers []Mapper
 }
 
 func New[T any]() Loader[T] {
@@ -40,8 +45,13 @@ func (l Loader[T]) WithConfigFile(opts ConfigFileOptions) Loader[T] {
 	return l
 }
 
+func (l Loader[T]) WithMappers(mappers ...Mapper) Loader[T] {
+	l.Mappers = append(l.Mappers, mappers...)
+	return l
+}
+
 func (l Loader[T]) SetPath(key string, value any) (Loader[T], error) {
-	refVal, err := setPath(reflect.ValueOf(&l.Data), key, value)
+	refVal, err := l.setPath(reflect.ValueOf(&l.Data), key, value)
 	if err == nil {
 		l.Data = refVal.Interface().(T)
 	}
@@ -61,9 +71,7 @@ func (l Loader[T]) Load() (T, error) {
 	return l.Data, nil
 }
 
-var ErrFieldNotFound = errors.New("field not found")
-
-func setPath(data reflect.Value, key string, value any) (reflect.Value, error) {
+func (l Loader[T]) setPath(data reflect.Value, key string, value any) (reflect.Value, error) {
 	if data.Kind() == reflect.Ptr {
 		data = reflect.Indirect(data)
 	}
@@ -76,12 +84,21 @@ func setPath(data reflect.Value, key string, value any) (reflect.Value, error) {
 	}
 
 	if found {
-		refVal, err := setPath(field, after, value)
+		refVal, err := l.setPath(field, after, value)
 		if err != nil {
 			return reflect.Value{}, err
 		}
 		field.Set(refVal)
 	} else {
+		fromType := reflect.TypeOf(value)
+		toType := field.Type()
+		for _, m := range l.Mappers {
+			var err error
+			value, err = m(fromType, toType, value)
+			if err != nil {
+				return reflect.Value{}, err
+			}
+		}
 		field.Set(reflect.ValueOf(value))
 	}
 	return data, nil

@@ -2,6 +2,7 @@ package fang
 
 import (
 	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -54,6 +55,28 @@ func TestLoader_SetPath(t *testing.T) {
 		// Then
 		assert.NoError(t, err)
 		assert.Equal(t, 42, sut.Data.Foo)
+	})
+
+	t.Run("custom type", func(t *testing.T) {
+		// Given
+		type MyType int
+
+		sut := New[struct {
+			Foo MyType
+		}]().
+			WithMappers(func(from, to reflect.Type, data any) (any, error) {
+				if from.Kind() == reflect.Int && to == reflect.TypeOf(MyType(0)) {
+					return MyType(data.(int)), nil
+				}
+				return data, nil
+			})
+
+		// When
+		sut, err := sut.SetPath("Foo", 42)
+
+		// Then
+		assert.NoError(t, err)
+		assert.Equal(t, MyType(42), sut.Data.Foo)
 	})
 }
 
